@@ -2,7 +2,7 @@
 
 Wiki 层(`wiki/`)的信息架构约定:页面类型、目录、命名、frontmatter、链接与簿记件。术语定义见根 `CONTEXT.md`;ingest/query/lint 的运行细则见「Ingest 运行手册」。
 
-决议来源:[Wayfinder #5 · Wiki 信息架构与 Schema 约定](https://github.com/Kunkgg/knowledge_base/issues/5) · [#6 · Ingest 工作流](https://github.com/Kunkgg/knowledge_base/issues/6)。
+决议来源:[Wayfinder #5 · Wiki 信息架构与 Schema 约定](https://github.com/Kunkgg/knowledge_base/issues/5) · [#6 · Ingest 工作流](https://github.com/Kunkgg/knowledge_base/issues/6) · [#7 · 源→Wiki 映射策略](https://github.com/Kunkgg/knowledge_base/issues/7)。
 
 ## 铁律
 
@@ -33,7 +33,7 @@ wiki/
 ```
 
 - `raw/` 子目录按**源仓库**分组,镜像仓库内相对路径原样;批次(B1–B4)只是 manifest 的字段,不刻进目录。第三源到位即新增子目录,无代码假设 54 源。
-- HTML 源的章节/词条切分产物也落 `raw/`(同源目录下);切分格式与规则归源→Wiki 映射策略决议。
+- HTML 源的章节/词条切分产物也落 `raw/`(同源目录下);切分格式与规则见「源→Wiki 映射」节。
 - **排除约定**:
   - 图分析与导航统计(Obsidian graph 过滤、lint 图规则):排除 `raw/`、`_staging/`、三簿记件、`.manifest.json`;
   - 站点构建(Quartz):排除 `raw/`、`_staging/`、`.manifest.json`(`assets/` 随站点发布)。
@@ -63,7 +63,7 @@ title: RAG               # 默认与文件名一致,Quartz 显示标题
 aliases: [Retrieval-Augmented Generation]   # 英文全称/缩写,dedup 依据
 tags: []
 summary: ""              # 1–2 句;分层检索与 index 摘要的来源
-sources: ["[[raw/teach-ai/lessons/0004-rag-mvp.html]]"]
+sources: ["[[raw/teach-ai/lessons/0004-rag-mvp/03-rag-pipeline.md]]"]
 created: 2026-08-23
 updated: 2026-08-23
 privacy: yellow          # 仅 🟡 页标 yellow;🟢 缺省不写
@@ -127,11 +127,62 @@ privacy: yellow          # 仅 🟡 页标 yellow;🟢 缺省不写
 
 增量判定与验收流转见「Ingest 运行手册」。
 
+## 源→Wiki 映射
+
+源到页面的翻译规则:切分、套件模板、trail 模板、去重粒度、`sources:` 指向、🟡 传递与第三源接口。ingest 逐源执行。
+
+### 切分(HTML 源)
+
+- 原 HTML 整文件照落 `raw/`(快照);另按自然章节切出 **markdown 切片**,ingest 直读切片,不重复啃 HTML 噪声。
+- 切片目录 = 源文件去扩展名;文件 `NN-slug.md`,两位序号 + 中文短 slug,每讲典型 3–5 片:`raw/teach-ai/lessons/0004-rag-mvp/01-问题设定.md`。
+- `glossary.html` 按词条粒度,每词条一文件 `raw/teach-ai/reference/glossary/RAG.md`。词条全量进 `glossary.md` 词表;概念页仍按建页阈值另建,词条切片留作断链后补的现成素材。
+- cloze 还原成陈述句后取知识;练习仅当题干有独立价值才进正文。
+- 代码保留**能独立读懂的最小核心片段**:概念页正文代码块 ≤2 个、各 ≤30 行;脚手架(HTML/CSS、key 加载、调试打印)丢弃,全文靠 `sources:` 回链。
+- 切片是不可变中间产物:首写后不改写,合格线是「够 ingest 读」;重切属 schema 修订(log 记 `schema`)。
+- md 源不切分,整文件即切片。
+
+### 套件映射模板
+
+teach_ai 与 vault yazi 套件同构(`lessons` / `learning-records` / `MISSION` / `RESOURCES` / `reference` / `index` / `NOTES`),共用一张映射模板,未来同构源亦然:
+
+| 套件成员 | 映射 |
+|---|---|
+| `lessons/` | course 页一节(每讲 2–4 句「讲透什么」+ 链概念/实体页);概念/实体页按建页阈值 |
+| `learning-records/` + `MISSION` + `RESOURCES` | trail 页叙事素材 |
+| `reference/` | 概念/实体页补充源,不单独建页型 |
+| 源内 `index.md` | 不建页,信息并入 course/trail |
+| `NOTES.md` | 不建页;环境事实行内引用并括注环境(如「(WSL2 下实测)」——自然语言括注,不新增 provenance 标记) |
+
+### trail 模板
+
+每学习域一页(v1:AI 工程、yazi;极客时间并入 AI 工程作外延小节,不独立)。五段结构:
+
+**动机**(MISSION 摘要)→ **主线**(课程时间线,链 course 页)→ **关键决策与转折**(learning-records 叙事;结论已拆页处只留链接)→ **资源分级**(RESOURCES 摘选)→ **现状与下一步**。一页一屏:trail 是叙事不是仓库。
+
+### 去重与粒度
+
+1. 同一概念一页多源:首建后 `sources:` 追加,不按讲分页。
+2. 细分不预拆:子题自身达建页阈值才独立(chunking 在 0003 整讲展开 → 独立;RAG 页不预拆 retrieval 子页)。
+3. 单讲新建概念/实体页 **≤5**,glossary 行不限;宁可留断链由 lint 报后补,不预建 stub。
+4. 同名歧义:文件名加限定词消歧(如 `agent memory.md`),glossary 收缩写防三套叫法。
+
+### `sources:` 指向
+
+内容页(概念/实体)指**切片**(实际内容载体);course/trail 综述页列**整文件**;综述页与切片的从属由切片目录名承载。
+
+### privacy 🟡 传递
+
+按页面实际内容传递:页面复述了个人语境细节(年龄、在职、项目背景)才标 `privacy: yellow`;纯技术内容即使源自 🟡 源不标(`sources:` 仍如实回链)。批尾验收时顺带核对 yellow 页必要性。
+
+### 第三源(collected-html)接口
+
+落位 `raw/collected-html/` + manifest 新增源组;复用上述切分规则,非教学类 HTML 届时按需增补;**到位 ≠ 入库**——质量与主题相关性由届时 effort 判定。schema 无需改动即可接入。
+
 ## Ingest 运行手册
 
 启动:人说「ingest <批次|文件>」→ 读 `.manifest.json` 算 delta(未 ingest / hash 变更的源)。
 
-1. **逐源处理**:源快照拷入 `raw/` 同源目录(🔴 拒绝落盘;🟡 记 `privacy: yellow`)→ HTML 按源→Wiki 映射策略切分、产物落同源目录 → 编译页面草稿**全部进 `_staging/`**(含 index/log/glossary 簿记草稿)。
+1. **逐源处理**:源快照拷入 `raw/` 同源目录(🔴 拒绝落盘;🟡 记 `privacy: yellow`)→ HTML 按「源→Wiki 映射」节切分、产物落同源目录 → 编译页面草稿**全部进 `_staging/`**(含 index/log/glossary 簿记草稿)。
 2. **调 schema 期**(B1 前 3 源):每源完成即停,人过目纠偏后继续。
 3. **批尾验收**:人过目 `_staging/` + `git diff` → OK 后 agent 归位全部文件、回写 manifest(`ingested_at` / `pages`)、追加 log → 一次 commit `wiki: ingest <批> · <n> sources`;驳回则 agent 改后复审。**manifest 只在归位时回写**——commit 了才算 ingest 完成,delta 语义干净。
 4. **结构 lint(层 1,会话收尾)**,清单:
