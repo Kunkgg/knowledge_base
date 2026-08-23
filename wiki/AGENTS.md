@@ -1,13 +1,13 @@
 # Wiki Schema
 
-Wiki 层(`wiki/`)的信息架构约定:页面类型、目录、命名、frontmatter、链接与簿记件。术语定义见根 `CONTEXT.md`;ingest/query/lint 的工作流细则(分批节奏、验收点、回填触发、lint 清单)另定,本文件只锁结构。
+Wiki 层(`wiki/`)的信息架构约定:页面类型、目录、命名、frontmatter、链接与簿记件。术语定义见根 `CONTEXT.md`;ingest/query/lint 的运行细则见「Ingest 运行手册」。
 
-决议来源:[Wayfinder #5 · Wiki 信息架构与 Schema 约定](https://github.com/Kunkgg/knowledge_base/issues/5)。
+决议来源:[Wayfinder #5 · Wiki 信息架构与 Schema 约定](https://github.com/Kunkgg/knowledge_base/issues/5) · [#6 · Ingest 工作流](https://github.com/Kunkgg/knowledge_base/issues/6)。
 
 ## 铁律
 
-1. **源不可变**:`raw/` 只读——任何操作不改写、不删除、不移动 raw/ 文件。
-2. **先验收后归位**:一切新页/改页先进 `_staging/`,人工过目后移入正式目录。
+1. **源不可变**:`raw/` **入库后只读**——此后任何操作不改写、不删除、不移动 raw/ 文件;唯一合法的写时刻是入库动作本身(拷贝快照、切分产物首写),由 ingest 会话执行。
+2. **先验收后归位**:一切新页/改页先进 `_staging/`,人工过目后移入正式目录(query 回填的 reports 页除外,见运行手册)。
 3. **中文正文 + 英文术语**:正文行文中文,术语保留英文原文、不硬译;文件名不受此条约束(见「命名约定」,主名从众)。
 
 ## 目录结构
@@ -33,7 +33,7 @@ wiki/
 ```
 
 - `raw/` 子目录按**源仓库**分组,镜像仓库内相对路径原样;批次(B1–B4)只是 manifest 的字段,不刻进目录。第三源到位即新增子目录,无代码假设 54 源。
-- HTML 源的章节/词条切分产物也落 `raw/`(同源目录下);切分格式与规则归 ingest 工作流决议。
+- HTML 源的章节/词条切分产物也落 `raw/`(同源目录下);切分格式与规则归源→Wiki 映射策略决议。
 - **排除约定**:
   - 图分析与导航统计(Obsidian graph 过滤、lint 图规则):排除 `raw/`、`_staging/`、三簿记件、`.manifest.json`;
   - 站点构建(Quartz):排除 `raw/`、`_staging/`、`.manifest.json`(`assets/` 随站点发布)。
@@ -125,4 +125,40 @@ privacy: yellow          # 仅 🟡 页标 yellow;🟢 缺省不写
 }
 ```
 
-增量判定、验收流转等执行细则归 ingest 工作流。
+增量判定与验收流转见「Ingest 运行手册」。
+
+## Ingest 运行手册
+
+启动:人说「ingest <批次|文件>」→ 读 `.manifest.json` 算 delta(未 ingest / hash 变更的源)。
+
+1. **逐源处理**:源快照拷入 `raw/` 同源目录(🔴 拒绝落盘;🟡 记 `privacy: yellow`)→ HTML 按源→Wiki 映射策略切分、产物落同源目录 → 编译页面草稿**全部进 `_staging/`**(含 index/log/glossary 簿记草稿)。
+2. **调 schema 期**(B1 前 3 源):每源完成即停,人过目纠偏后继续。
+3. **批尾验收**:人过目 `_staging/` + `git diff` → OK 后 agent 归位全部文件、回写 manifest(`ingested_at` / `pages`)、追加 log → 一次 commit `wiki: ingest <批> · <n> sources`;驳回则 agent 改后复审。**manifest 只在归位时回写**——commit 了才算 ingest 完成,delta 语义干净。
+4. **结构 lint(层 1,会话收尾)**,清单:
+   - 断链 wikilink(被提及但缺页)
+   - 孤儿页(无入链)
+   - 缺必填 frontmatter
+   - manifest ↔ 文件系统不一致
+   - index 覆盖率(正式页是否每页一行)
+
+   小问题当场修,大问题记票。
+
+### query 回填
+
+综合答案值得留(比较/分析/发现的联系)→ **提议** → 人点头 → 写 `reports/YYYY-MM-DD-slug.md`(**免 staging**;frontmatter `sources:` 回链触及的概念页)+ log 记 `query`。
+
+### 语义 lint(层 2,独立会话)
+
+触发:每月 或 每积累 ~10 次 ingest,先到先跑。清单:
+
+- 矛盾检测:随机采样页面对(O(N²) 不全量)
+- dedup 别名页(缩写/原名/译名三套叫法)
+- stub 清理:<100 词且 30 天未更新 → 合并或删
+- cross-link 补缺(未链接的提及)
+- glossary 审计
+
+改动照走 `_staging/` 验收。
+
+### 脚本化留门
+
+一切状态显式化于 manifest(账本)+ log(时间线)+ git(审计),无会话内存活的隐藏状态——本手册即未来脚本的规格底稿;脚本触发与无人值守边界待会话驱动稳定后再议(地图雾区)。
