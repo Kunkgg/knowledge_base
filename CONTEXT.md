@@ -10,6 +10,14 @@
 不可变的原始层——`teach_ai`、`Obsidian-Vault` 等知识原文;v1 以快照形式冻结在 `wiki/raw/`。
 _Avoid_: 语料、原始数据
 
+**切片**:
+raw/ 下由 HTML 源按章节/词条切出的 markdown 中间产物;ingest 的直接读物,首写后不可变。
+_Avoid_: 分块、碎片(与 RAG 的 chunking 术语冲突)
+
+**套件**:
+同构的源包(lessons、learning-records、MISSION、RESOURCES、reference、index、NOTES),如 teach_ai 与 vault yazi;共用同一张套件映射模板。
+_Avoid_: 仓库(泛指源 git repo)
+
 **Wiki**:
 LLM 全权维护、Obsidian 兼容的 markdown 层(`wiki/`);一次编译、持续维护的复利产物。
 _Avoid_: 知识库(与仓库名混淆)、第二大脑
